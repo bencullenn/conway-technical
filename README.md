@@ -1,1 +1,1 @@
-# conway-project
+# conway-technical
