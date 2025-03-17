@@ -9,7 +9,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 
-export default function FileUpload() {
+interface FileUploadProps {
+  onUploadSuccess?: () => void;
+}
+
+export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -71,7 +75,8 @@ export default function FileUpload() {
         setUploading(false);
         setFile(null);
         setProgress(0);
-        // In a real app, you would update state or redirect to the dataset view
+        // Call the onUploadSuccess callback if provided
+        onUploadSuccess?.();
       }, 1000);
     } catch (error) {
       clearInterval(interval);
