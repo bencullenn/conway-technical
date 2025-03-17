@@ -7,11 +7,14 @@ from datetime import datetime
 from database import get_db
 from model import Dataset, Crime
 from sqlalchemy.orm import Session
+from sqlalchemy import text
 from typing import List, Optional
 from supabase import create_client, Client
 from io import BytesIO
 import time
 from pydantic import BaseModel
+import random
+import asyncio
 
 dotenv.load_dotenv()
 
@@ -40,6 +43,26 @@ class CrimeResponse(BaseModel):
     lat: Optional[float]
     lon: Optional[float]
     part_1: bool
+
+
+class AnomalyRecord(BaseModel):
+    id: int
+    date_time_occ: str
+    crime_code_desc: str
+    location: str
+    area_name: str
+    status_desc: str
+    lat: float
+    lon: float
+    anomaly_description: str
+    confidence_score: float
+
+
+class AnomalyDetectionResponse(BaseModel):
+    anomalies: List[AnomalyRecord]
+    total_analyzed: int
+    analysis_time_seconds: float
+    anomaly_count: int
 
 
 @app.post("/upload-dataset")
@@ -224,8 +247,119 @@ async def process(file: UploadFile, db: Session):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-async def detect():
-    pass
+@app.post("/datasets/{dataset_id}/detect-anomalies")
+async def detect_anomalies(dataset_id: str, db: Session = Depends(get_db)):
+    start_time = time.time()
+
+    try:
+        # Step 1: Calculate area-wide statistics
+        query = text("""
+            WITH location_counts AS (
+                -- Count crimes per location within each area
+                SELECT 
+                    area_name,
+                    location,
+                    lat,
+                    lon,
+                    COUNT(*) as crime_count
+                FROM crime 
+                WHERE dataset = :dataset_id
+                    AND lat IS NOT NULL 
+                    AND lon IS NOT NULL
+                GROUP BY area_name, location, lat, lon
+            ),
+            area_metrics AS (
+                -- Calculate statistics per area
+                SELECT 
+                    area_name,
+                    AVG(crime_count) as avg_crimes,
+                    STDDEV(crime_count) as stddev_crimes,
+                    COUNT(*) as total_locations
+                FROM location_counts
+                GROUP BY area_name
+            )
+            -- Identify anomalous locations (more than 2 standard deviations from mean)
+            SELECT 
+                lc.area_name,
+                lc.location,
+                lc.lat,
+                lc.lon,
+                lc.crime_count,
+                am.avg_crimes,
+                am.stddev_crimes,
+                (lc.crime_count - am.avg_crimes) / NULLIF(am.stddev_crimes, 0) as z_score
+            FROM location_counts lc
+            JOIN area_metrics am ON lc.area_name = am.area_name
+            WHERE (lc.crime_count - am.avg_crimes) / NULLIF(am.stddev_crimes, 0) > 2
+            ORDER BY (lc.crime_count - am.avg_crimes) / NULLIF(am.stddev_crimes, 0) DESC
+        """)
+
+        print("Started area stats query")
+        area_stats = db.execute(query, {"dataset_id": dataset_id}).fetchall()
+        print("Finished area stats query")
+
+        # Step 2: For each anomalous location, get the most recent crimes
+        anomalies = []
+        total_analyzed = db.query(Crime).filter(Crime.dataset == dataset_id).count()
+
+        print("Analyzing areas")
+        for stat in area_stats:
+            # Get a representative crime from this location
+            crime = (
+                db.query(Crime)
+                .filter(
+                    Crime.dataset == dataset_id,
+                    Crime.location == stat.location,
+                    Crime.area_name == stat.area_name,
+                )
+                .first()
+            )
+
+            if crime:
+                z_score = stat.z_score
+                confidence_score = min(
+                    0.99, (z_score - 2) / 3
+                )  # Scale z-score to confidence
+
+                # Generate a detailed description of why this is anomalous
+                avg_crimes = round(stat.avg_crimes, 1)
+                actual_crimes = stat.crime_count
+                times_higher = round(actual_crimes / avg_crimes, 1)
+
+                description = (
+                    f"This location has {actual_crimes} reported crimes, which is {times_higher}x higher "
+                    f"than the average of {avg_crimes} crimes per location in {stat.area_name}. "
+                )
+
+                anomalies.append(
+                    AnomalyRecord(
+                        id=crime.id,
+                        date_time_occ=crime.date_time_occ.isoformat(),
+                        crime_code_desc=crime.crime_code_desc,
+                        location=crime.location,
+                        area_name=crime.area_name,
+                        status_desc=crime.status_desc,
+                        lat=crime.lat,
+                        lon=crime.lon,
+                        anomaly_description=description,
+                        confidence_score=confidence_score,
+                    )
+                )
+
+        analysis_time = time.time() - start_time
+
+        return AnomalyDetectionResponse(
+            anomalies=anomalies,
+            total_analyzed=total_analyzed,
+            analysis_time_seconds=analysis_time,
+            anomaly_count=len(anomalies),
+        )
+
+    except Exception as e:
+        print(f"Error in anomaly detection: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to perform anomaly detection: {str(e)}"
+        )
 
 
 @app.get("/datasets/{dataset_id}")

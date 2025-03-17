@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import DataTable from "@/components/data-table";
 import DataCharts from "@/components/data-charts";
 import DataMap from "@/components/data-map";
+import AnomalyDetection from "@/components/anomaly-detection";
 import { apiClient } from "@/lib/api-client";
 import type { Dataset } from "@/lib/api-types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -74,9 +75,9 @@ export default function DatasetPage() {
 
       <Tabs defaultValue="table" className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsTrigger value="anomaly">Anomaly Detection</TabsTrigger>
           <TabsTrigger value="table">Table View</TabsTrigger>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="map">Map View</TabsTrigger>
+          <TabsTrigger value="charts">Chart View</TabsTrigger>
         </TabsList>
         <TabsContent value="table">
           <DataTable datasetId={params.id as string} />
@@ -84,8 +85,8 @@ export default function DatasetPage() {
         <TabsContent value="charts">
           <DataCharts datasetId={params.id as string} />
         </TabsContent>
-        <TabsContent value="map">
-          <DataMap datasetId={params.id as string} />
+        <TabsContent value="anomaly">
+          <AnomalyDetection datasetId={params.id as string} />
         </TabsContent>
       </Tabs>
     </div>

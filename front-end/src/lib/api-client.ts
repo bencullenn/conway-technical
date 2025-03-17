@@ -81,9 +81,8 @@ class ApiClient {
   async detectAnomalies(
     request: AnomalyDetectionRequest
   ): Promise<AnomalyDetectionResponse> {
-    return this.request("/analysis/detect-anomalies", {
+    return this.request(`/datasets/${request.datasetId}/detect-anomalies`, {
       method: "POST",
-      body: JSON.stringify(request),
     });
   }
 
