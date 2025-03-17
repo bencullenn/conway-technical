@@ -71,9 +71,16 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       }, 1000);
     } catch (error) {
       clearInterval(interval);
+      setProgress(0);
       setUploading(false);
 
-      toast.error("There was an error uploading your file");
+      // Display the specific error message from the backend
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to upload file";
+      toast.error(errorMessage);
+
+      // Reset file state on error
+      setFile(null);
     }
   };
 
@@ -82,8 +89,14 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
       <CardContent className="pt-6">
         <div className="flex flex-col items-center space-y-4">
           <div
-            className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-12 w-full flex flex-col items-center justify-center cursor-pointer hover:border-primary/50 transition-colors"
-            onClick={() => document.getElementById("file-upload")?.click()}
+            className={`border-2 border-dashed rounded-lg p-12 w-full flex flex-col items-center justify-center cursor-pointer transition-colors ${
+              uploading
+                ? "border-muted-foreground/25 cursor-not-allowed"
+                : "border-muted-foreground/25 hover:border-primary/50"
+            }`}
+            onClick={() =>
+              !uploading && document.getElementById("file-upload")?.click()
+            }
           >
             <Upload className="h-10 w-10 text-muted-foreground mb-4" />
             <p className="text-sm text-muted-foreground text-center">

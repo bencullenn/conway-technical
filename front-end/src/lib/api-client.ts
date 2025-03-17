@@ -33,11 +33,16 @@ class ApiClient {
       headers,
     });
 
+    const data = await response.json();
+
     if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
+      // Extract error message from the response
+      const errorMessage =
+        data.detail || data.message || "An unknown error occurred";
+      throw new Error(errorMessage);
     }
 
-    return response.json();
+    return data;
   }
 
   /**
