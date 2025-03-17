@@ -3,10 +3,9 @@
 import type React from "react";
 
 import { useState } from "react";
-import { Upload, FileUp } from "lucide-react";
+import { Upload, FileUp, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
@@ -19,7 +18,6 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [progress, setProgress] = useState(0);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -42,42 +40,23 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     if (!file) return;
 
     setUploading(true);
-    setProgress(0);
-
-    // Simulate progress
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 95) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 5;
-      });
-    }, 200);
 
     try {
       const response = await apiClient.uploadDataset(file);
-
-      clearInterval(interval);
-      setProgress(100);
-
       toast.success("Dataset uploaded successfully");
 
-      // Simulate redirect or state update after processing
-      setTimeout(() => {
-        setUploading(false);
-        setFile(null);
-        setProgress(0);
-        // Call the onUploadSuccess callback if provided
-        onUploadSuccess?.();
-        // Redirect to the dataset page
-        if (response.datasetId) {
-          router.push(`/dataset/${response.datasetId}`);
-        }
-      }, 1000);
+      // Update state and redirect
+      setUploading(false);
+      setFile(null);
+
+      // Call the onUploadSuccess callback if provided
+      onUploadSuccess?.();
+
+      // Redirect to the dataset page
+      if (response.datasetId) {
+        router.push(`/dataset/${response.datasetId}`);
+      }
     } catch (error) {
-      clearInterval(interval);
-      setProgress(0);
       setUploading(false);
 
       // Display the specific error message from the backend
@@ -127,10 +106,10 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
           )}
 
           {uploading && (
-            <div className="w-full space-y-2">
-              <Progress value={progress} className="w-full" />
-              <p className="text-xs text-center text-muted-foreground">
-                {progress < 100 ? "Uploading..." : "Processing..."}
+            <div className="w-full flex flex-col items-center space-y-3">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm text-center text-muted-foreground">
+                Uploading and processing dataset...
               </p>
             </div>
           )}
