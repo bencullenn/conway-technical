@@ -13,8 +13,6 @@ from supabase import create_client, Client
 from io import BytesIO
 import time
 from pydantic import BaseModel
-import random
-import asyncio
 
 dotenv.load_dotenv()
 

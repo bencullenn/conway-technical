@@ -154,9 +154,9 @@ export default function AnomalyDetection({ datasetId }: AnomalyDetectionProps) {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              {data.anomalies.map((anomaly) => (
+              {data.anomalies.map((anomaly, index) => (
                 <Marker
-                  key={`${anomaly.id}-${anomaly.lat}-${anomaly.lon}`}
+                  key={index}
                   position={[anomaly.lat, anomaly.lon]}
                   icon={anomalyIcon}
                   eventHandlers={{
