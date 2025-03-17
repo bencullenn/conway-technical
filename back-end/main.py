@@ -65,6 +65,12 @@ class AnomalyDetectionResponse(BaseModel):
     anomaly_count: int
 
 
+class ChartDataResponse(BaseModel):
+    labels: List[str]
+    values: List[int]
+    total: int
+
+
 @app.post("/upload-dataset")
 async def upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
     dataset_id = await process(file, db)
@@ -455,3 +461,149 @@ async def get_crimes(
     except Exception as e:
         print(f"\nError occurred: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/datasets/{dataset_id}/charts/crimes-by-area")
+async def get_crimes_by_area(
+    dataset_id: str,
+    start_date: str = "2024-01-01",
+    end_date: str = "2024-12-31",
+    db: Session = Depends(get_db),
+):
+    try:
+        query = text("""
+            SELECT 
+                area_name,
+                COUNT(*) as crime_count
+            FROM crime 
+            WHERE dataset = :dataset_id
+                AND date_time_occ >= :start_date
+                AND date_time_occ <= :end_date
+            GROUP BY area_name
+            ORDER BY crime_count DESC
+        """)
+
+        results = db.execute(
+            query,
+            {
+                "dataset_id": dataset_id,
+                "start_date": start_date,
+                "end_date": end_date + " 23:59:59",
+            },
+        ).fetchall()
+
+        total = sum(row.crime_count for row in results)
+
+        return ChartDataResponse(
+            labels=[row.area_name for row in results],
+            values=[row.crime_count for row in results],
+            total=total,
+        )
+
+    except Exception as e:
+        print(f"Error in crime count query: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get crime count: {str(e)}"
+        )
+
+
+@app.get("/datasets/{dataset_id}/charts/crimes-by-type")
+async def get_crimes_by_type(
+    dataset_id: str,
+    start_date: str = "2024-01-01",
+    end_date: str = "2024-12-31",
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    try:
+        query = text("""
+            SELECT 
+                crime_code_desc,
+                COUNT(*) as crime_count
+            FROM crime 
+            WHERE dataset = :dataset_id
+                AND date_time_occ >= :start_date
+                AND date_time_occ <= :end_date
+            GROUP BY crime_code_desc
+            ORDER BY crime_count DESC
+            LIMIT :limit
+        """)
+
+        results = db.execute(
+            query,
+            {
+                "dataset_id": dataset_id,
+                "start_date": start_date,
+                "end_date": end_date + " 23:59:59",
+                "limit": limit,
+            },
+        ).fetchall()
+
+        total = sum(row.crime_count for row in results)
+
+        return ChartDataResponse(
+            labels=[row.crime_code_desc for row in results],
+            values=[row.crime_count for row in results],
+            total=total,
+        )
+
+    except Exception as e:
+        print(f"Error in crime type query: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get crime type count: {str(e)}"
+        )
+
+
+@app.get("/datasets/{dataset_id}/charts/crimes-by-time")
+async def get_crimes_by_time(
+    dataset_id: str,
+    start_date: str = "2024-01-01",
+    end_date: str = "2024-12-31",
+    db: Session = Depends(get_db),
+):
+    try:
+        query = text("""
+            SELECT 
+                EXTRACT(HOUR FROM date_time_occ) as hour,
+                COUNT(*) as crime_count
+            FROM crime 
+            WHERE dataset = :dataset_id
+                AND date_time_occ >= :start_date
+                AND date_time_occ <= :end_date
+            GROUP BY EXTRACT(HOUR FROM date_time_occ)
+            ORDER BY hour
+        """)
+
+        results = db.execute(
+            query,
+            {
+                "dataset_id": dataset_id,
+                "start_date": start_date,
+                "end_date": end_date + " 23:59:59",
+            },
+        ).fetchall()
+
+        total = sum(row.crime_count for row in results)
+
+        # Format hours as "12 AM", "1 AM", etc.
+        def format_hour(hour):
+            if hour == 0:
+                return "12 AM"
+            elif hour < 12:
+                return f"{hour} AM"
+            elif hour == 12:
+                return "12 PM"
+            else:
+                return f"{hour - 12} PM"
+
+        return ChartDataResponse(
+            labels=[format_hour(int(row.hour)) for row in results],
+            values=[row.crime_count for row in results],
+            total=total,
+        )
+
+    except Exception as e:
+        print(f"Error in crime time query: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get crime time count: {str(e)}"
+        )

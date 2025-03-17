@@ -9,6 +9,7 @@ import type {
   Crime,
   CrimesResponse,
   GetCrimesParams,
+  ChartDateRange,
 } from "./api-types";
 import { env } from "@/config/env";
 
@@ -109,6 +110,45 @@ class ApiClient {
     });
 
     return this.request(`/datasets/${params.datasetId}/crimes?${searchParams}`);
+  }
+
+  async getCrimesByArea(
+    datasetId: string,
+    dateRange: ChartDateRange
+  ): Promise<ChartDataResponse> {
+    const searchParams = new URLSearchParams({
+      start_date: dateRange.startDate,
+      end_date: dateRange.endDate,
+    });
+    return this.request(
+      `/datasets/${datasetId}/charts/crimes-by-area?${searchParams}`
+    );
+  }
+
+  async getCrimesByType(
+    datasetId: string,
+    dateRange: ChartDateRange
+  ): Promise<ChartDataResponse> {
+    const searchParams = new URLSearchParams({
+      start_date: dateRange.startDate,
+      end_date: dateRange.endDate,
+    });
+    return this.request(
+      `/datasets/${datasetId}/charts/crimes-by-type?${searchParams}`
+    );
+  }
+
+  async getCrimesByTime(
+    datasetId: string,
+    dateRange: ChartDateRange
+  ): Promise<ChartDataResponse> {
+    const searchParams = new URLSearchParams({
+      start_date: dateRange.startDate,
+      end_date: dateRange.endDate,
+    });
+    return this.request(
+      `/datasets/${datasetId}/charts/crimes-by-time?${searchParams}`
+    );
   }
 }
 

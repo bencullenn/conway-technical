@@ -64,7 +64,12 @@ export interface ChartDataRequest {
 export interface ChartDataResponse {
   labels: string[];
   values: number[];
-  anomalyCounts?: number[];
+  total: number;
+}
+
+export interface ChartDateRange {
+  startDate: string;
+  endDate: string;
 }
 
 export interface Crime {

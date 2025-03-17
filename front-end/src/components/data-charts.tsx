@@ -1,12 +1,8 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   BarChart,
   Bar,
@@ -14,175 +10,195 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  TooltipProps,
 } from "recharts";
-
-interface CrimeData {
-  name: string;
-  count: number;
-  anomalies: number;
-}
-
-interface SeverityData {
-  name: string;
-  value: number;
-  color: string;
-}
-
-// Mock data - in a real app, this would come from Supabase
-const crimesByType: CrimeData[] = [
-  { name: "Theft", count: 45, anomalies: 3 },
-  { name: "Assault", count: 28, anomalies: 2 },
-  { name: "Vandalism", count: 32, anomalies: 1 },
-  { name: "Fraud", count: 19, anomalies: 4 },
-  { name: "Burglary", count: 23, anomalies: 2 },
-];
-
-const crimesByLocation: CrimeData[] = [
-  { name: "Downtown", count: 38, anomalies: 2 },
-  { name: "Midtown", count: 29, anomalies: 3 },
-  { name: "Uptown", count: 24, anomalies: 1 },
-  { name: "Financial District", count: 31, anomalies: 4 },
-  { name: "Residential Area", count: 25, anomalies: 2 },
-];
-
-const crimesBySeverity: SeverityData[] = [
-  { name: "Low", value: 35, color: "#94a3b8" },
-  { name: "Medium", value: 45, color: "#3b82f6" },
-  { name: "High", value: 20, color: "#ef4444" },
-];
-
-const COLORS = ["#94a3b8", "#3b82f6", "#ef4444", "#10b981", "#f59e0b"];
+import { apiClient } from "@/lib/api-client";
+import type { ChartDataResponse } from "@/lib/api-types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface DataChartsProps {
   datasetId: string;
 }
 
+function ChartLoadingSkeleton() {
+  return (
+    <div className="space-y-4">
+      <Skeleton className="h-8 w-48" />
+      <Skeleton className="h-[300px] w-full" />
+    </div>
+  );
+}
+
 export default function DataCharts({ datasetId }: DataChartsProps) {
-  const formatTooltip = (value: number, name: string) => {
-    if (name === "anomalies") {
-      return [`${value} anomalies`, "Anomalies"];
+  const [startDate, setStartDate] = useState("2024-01-01");
+  const [endDate, setEndDate] = useState("2024-12-31");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [areaData, setAreaData] = useState<ChartDataResponse | null>(null);
+  const [typeData, setTypeData] = useState<ChartDataResponse | null>(null);
+  const [timeData, setTimeData] = useState<ChartDataResponse | null>(null);
+
+  const fetchChartData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const dateRangeParam = {
+        startDate: startDate,
+        endDate: endDate,
+      };
+
+      const [areaResponse, typeResponse, timeResponse] = await Promise.all([
+        apiClient.getCrimesByArea(datasetId, dateRangeParam),
+        apiClient.getCrimesByType(datasetId, dateRangeParam),
+        apiClient.getCrimesByTime(datasetId, dateRangeParam),
+      ]);
+
+      setAreaData(areaResponse);
+      setTypeData(typeResponse);
+      setTimeData(timeResponse);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load chart data"
+      );
+    } finally {
+      setLoading(false);
     }
-    return [`${value} incidents`, "Total Incidents"];
   };
 
-  const formatPieLabel = ({
-    name,
-    percent,
-  }: {
-    name: string;
-    percent: number;
-  }) => {
-    return `${name}: ${(percent * 100).toFixed(0)}%`;
-  };
+  useEffect(() => {
+    fetchChartData();
+  }, [datasetId, startDate, endDate]);
 
-  const formatPieTooltip = (value: number) => {
-    return [`${value} incidents`, "Count"];
+  if (error) {
+    return <div className="text-red-500 p-4">{error}</div>;
+  }
+
+  const formatData = (data: ChartDataResponse | null) => {
+    if (!data) return [];
+    return data.labels.map((label, index) => ({
+      name: label.length > 30 ? label.substring(0, 30) + "..." : label,
+      value: data.values[index],
+    }));
   };
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
-      <Card className="col-span-2">
-        <CardHeader>
-          <CardTitle>Crime Distribution by Type</CardTitle>
-          <CardDescription>
-            Number of crimes reported by type with anomaly indicators
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={crimesByType}
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 20,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip formatter={formatTooltip} />
-                <Legend />
-                <Bar dataKey="count" fill="#3b82f6" name="Total Incidents" />
-                <Bar dataKey="anomalies" fill="#ef4444" name="Anomalies" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <div className="flex justify-end gap-2">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">From:</span>
+          <Input
+            type="date"
+            value={startDate}
+            min="2024-01-01"
+            max="2024-12-31"
+            onChange={(e) => setStartDate(e.target.value)}
+            className="w-auto"
+          />
+          <span className="text-sm text-muted-foreground">To:</span>
+          <Input
+            type="date"
+            value={endDate}
+            min="2024-01-01"
+            max="2024-12-31"
+            onChange={(e) => setEndDate(e.target.value)}
+            className="w-auto"
+          />
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Crime Distribution by Location</CardTitle>
-          <CardDescription>
-            Number of crimes reported by location
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={crimesByLocation}
-                layout="vertical"
-                margin={{
-                  top: 5,
-                  right: 30,
-                  left: 80,
-                  bottom: 5,
-                }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis type="category" dataKey="name" />
-                <Tooltip formatter={formatTooltip} />
-                <Legend />
-                <Bar dataKey="count" fill="#10b981" name="Total Incidents" />
-                <Bar dataKey="anomalies" fill="#ef4444" name="Anomalies" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Crimes by Area</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <ChartLoadingSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={formatData(areaData)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={100}
+                    interval={0}
+                  />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#2563eb" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Crime Severity Distribution</CardTitle>
-          <CardDescription>
-            Breakdown of crimes by severity level
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="h-[300px] flex items-center justify-center">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={crimesBySeverity}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  label={formatPieLabel}
+        <Card className="h-[520px]">
+          <CardHeader>
+            <CardTitle>Top Crime Types</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[520px]">
+            {loading ? (
+              <ChartLoadingSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={formatData(typeData)}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 20,
+                    bottom: 160,
+                  }}
                 >
-                  {crimesBySeverity.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={formatPieTooltip} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={150}
+                    interval={0}
+                    tick={{ fontSize: 12 }}
+                  />
+                  <YAxis />
+                  <Tooltip
+                    formatter={(value: number, name: string, props: any) => {
+                      // Show full label in tooltip if it was truncated
+                      const fullLabel =
+                        typeData?.labels[props.payload.index] || name;
+                      return [value, fullLabel];
+                    }}
+                  />
+                  <Bar dataKey="value" fill="#2563eb" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Crimes by Time of Day</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <ChartLoadingSkeleton />
+            ) : (
+              <ResponsiveContainer width="100%" height={400}>
+                <BarChart data={formatData(timeData)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#2563eb" />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
