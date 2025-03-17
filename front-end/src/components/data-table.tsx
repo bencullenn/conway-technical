@@ -1,83 +1,58 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Badge } from "@/components/ui/badge"
-import { Search, Filter, AlertTriangle } from "lucide-react"
+import { useEffect, useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { apiClient } from "@/lib/api-client";
+import type { Crime } from "@/lib/api-types";
 
-// Mock data - in a real app, this would come from Supabase
-const mockData = [
-  {
-    id: "1",
-    date: "2023-01-15",
-    type: "Theft",
-    location: "Downtown",
-    lat: 40.7128,
-    lng: -74.006,
-    severity: "Medium",
-    isAnomaly: false,
-  },
-  {
-    id: "2",
-    date: "2023-01-16",
-    type: "Assault",
-    location: "Midtown",
-    lat: 40.7549,
-    lng: -73.984,
-    severity: "High",
-    isAnomaly: false,
-  },
-  {
-    id: "3",
-    date: "2023-01-17",
-    type: "Vandalism",
-    location: "Uptown",
-    lat: 40.8448,
-    lng: -73.8648,
-    severity: "Low",
-    isAnomaly: true,
-  },
-  {
-    id: "4",
-    date: "2023-01-18",
-    type: "Theft",
-    location: "Downtown",
-    lat: 40.7138,
-    lng: -74.007,
-    severity: "Medium",
-    isAnomaly: false,
-  },
-  {
-    id: "5",
-    date: "2023-01-19",
-    type: "Fraud",
-    location: "Financial District",
-    lat: 40.7075,
-    lng: -74.0113,
-    severity: "High",
-    isAnomaly: true,
-  },
-]
+interface DataTableProps {
+  datasetId: string;
+}
 
-export default function DataTable() {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [showAnomaliesOnly, setShowAnomaliesOnly] = useState(false)
+export default function DataTable({ datasetId }: DataTableProps) {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [crimes, setCrimes] = useState<Crime[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [startDate, setStartDate] = useState("2024-01-01");
+  const [endDate, setEndDate] = useState("2024-12-31");
 
-  // Filter data based on search term and anomaly filter
-  const filteredData = mockData.filter((item) => {
-    const matchesSearch =
-      item.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.location.toLowerCase().includes(searchTerm.toLowerCase())
+  const fetchCrimes = async () => {
+    try {
+      setLoading(true);
+      const response = await apiClient.getCrimes({
+        datasetId,
+        page,
+        page_size: 10,
+        search: searchTerm,
+        start_date: startDate,
+        end_date: endDate,
+      });
 
-    if (showAnomaliesOnly) {
-      return matchesSearch && item.isAnomaly
+      setCrimes(response.data);
+      setTotalPages(response.total_pages);
+    } catch (error) {
+      console.error("Error fetching crimes:", error);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return matchesSearch
-  })
+  useEffect(() => {
+    fetchCrimes();
+  }, [page, searchTerm, startDate, endDate, datasetId]);
 
   return (
     <div className="space-y-4">
@@ -88,33 +63,39 @@ export default function DataTable() {
             placeholder="Search by type or location..."
             className="pl-8"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1); // Reset to first page on search
+            }}
           />
         </div>
         <div className="flex gap-2">
-          <Button
-            variant={showAnomaliesOnly ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowAnomaliesOnly(!showAnomaliesOnly)}
-            className="whitespace-nowrap"
-          >
-            <AlertTriangle className="mr-2 h-4 w-4" />
-            {showAnomaliesOnly ? "Showing Anomalies" : "Show Anomalies"}
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Filter className="mr-2 h-4 w-4" />
-                Filter
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Filter by Date</DropdownMenuItem>
-              <DropdownMenuItem>Filter by Type</DropdownMenuItem>
-              <DropdownMenuItem>Filter by Location</DropdownMenuItem>
-              <DropdownMenuItem>Filter by Severity</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">From:</span>
+            <Input
+              type="date"
+              value={startDate}
+              min="2024-01-01"
+              max="2024-12-31"
+              onChange={(e) => {
+                setStartDate(e.target.value);
+                setPage(1);
+              }}
+              className="w-auto"
+            />
+            <span className="text-sm text-muted-foreground">To:</span>
+            <Input
+              type="date"
+              value={endDate}
+              min="2024-01-01"
+              max="2024-12-31"
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1);
+              }}
+              className="w-auto"
+            />
+          </div>
         </div>
       </div>
 
@@ -122,42 +103,43 @@ export default function DataTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Date</TableHead>
+              <TableHead>Date/Time</TableHead>
               <TableHead>Type</TableHead>
               <TableHead>Location</TableHead>
-              <TableHead>Severity</TableHead>
+              <TableHead>Area</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead>Category</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredData.length > 0 ? (
-              filteredData.map((row) => (
-                <TableRow key={row.id} className={row.isAnomaly ? "bg-red-50" : ""}>
-                  <TableCell>{row.date}</TableCell>
-                  <TableCell>{row.type}</TableCell>
-                  <TableCell>{row.location}</TableCell>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  Loading...
+                </TableCell>
+              </TableRow>
+            ) : crimes.length > 0 ? (
+              crimes.map((crime) => (
+                <TableRow key={crime.id}>
                   <TableCell>
-                    <Badge
-                      variant={
-                        row.severity === "High" ? "destructive" : row.severity === "Medium" ? "default" : "secondary"
-                      }
-                    >
-                      {row.severity}
-                    </Badge>
+                    {new Date(crime.date_time_occ).toLocaleString()}
+                  </TableCell>
+                  <TableCell>{crime.crime_code_desc}</TableCell>
+                  <TableCell>{crime.location}</TableCell>
+                  <TableCell>{crime.area_name}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{crime.status_desc}</Badge>
                   </TableCell>
                   <TableCell>
-                    {row.isAnomaly && (
-                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
-                        <AlertTriangle className="mr-1 h-3 w-3" />
-                        Anomaly
-                      </Badge>
+                    {crime.part_1 && (
+                      <Badge variant="destructive">Part 1</Badge>
                     )}
                   </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No results found
                 </TableCell>
               </TableRow>
@@ -165,7 +147,32 @@ export default function DataTable() {
           </TableBody>
         </Table>
       </div>
-    </div>
-  )
-}
 
+      <div className="flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
+          Page {page} of {totalPages}
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+            Previous
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Next
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}

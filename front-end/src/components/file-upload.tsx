@@ -9,12 +9,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { apiClient } from "@/lib/api-client";
+import { useRouter } from "next/navigation";
 
 interface FileUploadProps {
   onUploadSuccess?: () => void;
 }
 
 export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -54,12 +56,12 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     }, 200);
 
     try {
-      await apiClient.uploadDataset(file);
+      const response = await apiClient.uploadDataset(file);
 
       clearInterval(interval);
       setProgress(100);
 
-      toast.success("Your data is being processed");
+      toast.success("Dataset uploaded successfully");
 
       // Simulate redirect or state update after processing
       setTimeout(() => {
@@ -68,6 +70,10 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
         setProgress(0);
         // Call the onUploadSuccess callback if provided
         onUploadSuccess?.();
+        // Redirect to the dataset page
+        if (response.datasetId) {
+          router.push(`/dataset/${response.datasetId}`);
+        }
       }, 1000);
     } catch (error) {
       clearInterval(interval);

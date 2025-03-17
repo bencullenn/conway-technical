@@ -61,3 +61,32 @@ export interface ChartDataResponse {
   anomalyCounts?: number[]
 }
 
+export interface Crime {
+  id: number;
+  date_time_occ: string;
+  crime_code_desc: string;
+  location: string;
+  area_name: string;
+  status_desc: string;
+  lat: number | null;
+  lon: number | null;
+  part_1: boolean;
+}
+
+export interface CrimesResponse {
+  data: Crime[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+}
+
+export interface GetCrimesParams {
+  datasetId: string;
+  page: number;
+  page_size: number;
+  search?: string;
+  start_date: string;
+  end_date: string;
+}
+

@@ -80,7 +80,11 @@ const crimeData = [
   },
 ];
 
-export default function DataMap() {
+interface DataMapProps {
+  datasetId: string;
+}
+
+export default function DataMap({ datasetId }: DataMapProps) {
   const [selectedCrime, setSelectedCrime] = useState<
     (typeof crimeData)[0] | null
   >(null);

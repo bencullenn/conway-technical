@@ -59,7 +59,11 @@ const crimesBySeverity: SeverityData[] = [
 
 const COLORS = ["#94a3b8", "#3b82f6", "#ef4444", "#10b981", "#f59e0b"];
 
-export default function DataCharts() {
+interface DataChartsProps {
+  datasetId: string;
+}
+
+export default function DataCharts({ datasetId }: DataChartsProps) {
   const formatTooltip = (value: number, name: string) => {
     if (name === "anomalies") {
       return [`${value} anomalies`, "Anomalies"];

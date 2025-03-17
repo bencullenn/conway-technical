@@ -6,6 +6,9 @@ import type {
   AnomalyDetectionResponse,
   ChartDataRequest,
   ChartDataResponse,
+  Crime,
+  CrimesResponse,
+  GetCrimesParams,
 } from "./api-types";
 import { env } from "@/config/env";
 
@@ -92,6 +95,21 @@ class ApiClient {
       method: "POST",
       body: JSON.stringify(request),
     });
+  }
+
+  /**
+   * Get paginated crimes data with optional filters
+   */
+  async getCrimes(params: GetCrimesParams): Promise<CrimesResponse> {
+    const searchParams = new URLSearchParams({
+      page: params.page.toString(),
+      page_size: params.page_size.toString(),
+      start_date: params.start_date,
+      end_date: params.end_date,
+      ...(params.search && { search: params.search }),
+    });
+
+    return this.request(`/datasets/${params.datasetId}/crimes?${searchParams}`);
   }
 }
 

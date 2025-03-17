@@ -7,13 +7,11 @@ from datetime import datetime
 from database import get_db
 from model import Dataset, Crime
 from sqlalchemy.orm import Session
-from typing import List
-import numpy as np
+from typing import List, Optional
 from supabase import create_client, Client
-from sqlalchemy import select
 from io import BytesIO
 import time
-from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 dotenv.load_dotenv()
 
@@ -32,10 +30,26 @@ app.add_middleware(
 )
 
 
+class CrimeResponse(BaseModel):
+    id: int
+    date_time_occ: str
+    crime_code_desc: str
+    location: str
+    area_name: str
+    status_desc: str
+    lat: Optional[float]
+    lon: Optional[float]
+    part_1: bool
+
+
 @app.post("/upload-dataset")
 async def upload(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    await process(file, db)
-    return {"filename": file.filename}
+    dataset_id = await process(file, db)
+    return {
+        "success": True,
+        "datasetId": str(dataset_id),
+        "message": "Dataset uploaded and processed successfully",
+    }
 
 
 async def process(file: UploadFile, db: Session):
@@ -201,6 +215,9 @@ async def process(file: UploadFile, db: Session):
             f"Average processing speed: {len(records) / total_time:.0f} records/sec\n"
         )
 
+        # Return the dataset id
+        return dataset.id
+
     except Exception as e:
         print(f"\nError occurred: {str(e)}")
         db.rollback()
@@ -209,3 +226,98 @@ async def process(file: UploadFile, db: Session):
 
 async def detect():
     pass
+
+
+@app.get("/datasets/{dataset_id}")
+async def get_dataset(dataset_id: str, db: Session = Depends(get_db)):
+    try:
+        dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
+        if not dataset:
+            raise HTTPException(status_code=404, detail="Dataset not found")
+
+        # Get basic stats about the dataset
+        crime_count = db.query(Crime).filter(Crime.dataset == dataset.id).count()
+
+        return {
+            "dataset": {
+                "id": str(dataset.id),
+                "name": os.path.basename(dataset.file_path),
+                "createdAt": dataset.created_at.isoformat(),
+                "rowCount": crime_count,
+                "columnCount": 30,  # Hardcoded for now since we know our schema
+            }
+        }
+    except Exception as e:
+        print(f"\nError occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/datasets/{dataset_id}/crimes")
+async def get_crimes(
+    dataset_id: str,
+    page: int = 1,
+    page_size: int = 10,
+    search: str = "",
+    start_date: str = "2024-01-01",
+    end_date: str = "2024-12-31",
+    db: Session = Depends(get_db),
+):
+    try:
+        # Calculate offset
+        offset = (page - 1) * page_size
+
+        # Start building the query
+        query = db.query(Crime).filter(Crime.dataset == dataset_id)
+
+        # Apply date range filter
+        query = query.filter(
+            Crime.date_time_occ >= start_date,
+            Crime.date_time_occ <= end_date + " 23:59:59",
+        )
+
+        # Apply search filter if provided
+        if search:
+            search = f"%{search}%"
+            query = query.filter(
+                (Crime.location.ilike(search))
+                | (Crime.crime_code_desc.ilike(search))
+                | (Crime.area_name.ilike(search))
+            )
+
+        # Get total count for pagination
+        total_count = query.count()
+
+        # Get paginated results
+        crimes = (
+            query.order_by(Crime.date_time_occ).offset(offset).limit(page_size).all()
+        )
+
+        # Convert to response format
+        results = [
+            CrimeResponse(
+                id=crime.id,
+                date_time_occ=crime.date_time_occ.isoformat()
+                if crime.date_time_occ
+                else None,
+                crime_code_desc=crime.crime_code_desc,
+                location=crime.location,
+                area_name=crime.area_name,
+                status_desc=crime.status_desc,
+                lat=crime.lat,
+                lon=crime.lon,
+                part_1=crime.part_1,
+            )
+            for crime in crimes
+        ]
+
+        return {
+            "data": results,
+            "total": total_count,
+            "page": page,
+            "page_size": page_size,
+            "total_pages": (total_count + page_size - 1) // page_size,
+        }
+
+    except Exception as e:
+        print(f"\nError occurred: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
