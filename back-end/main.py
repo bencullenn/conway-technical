@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -13,12 +13,24 @@ app.add_middleware(
 )
 
 
-@app.get("/")
-async def root():
-    return {"message": "Welcome to the API"}
+@app.get("/upload-dataset")
+async def upload(
+    file: UploadFile = File(...),
+):
+    return {"filename": file.filename}
 
 
-if __name__ == "__main__":
-    import uvicorn
+async def ingest():
+    pass
 
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+async def clean():
+    pass
+
+
+async def transform():
+    pass
+
+
+async def detect():
+    pass
