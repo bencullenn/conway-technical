@@ -13,7 +13,7 @@ app.add_middleware(
 )
 
 
-@app.get("/upload-dataset")
+@app.post("/upload-dataset")
 async def upload(
     file: UploadFile = File(...),
 ):

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
+import { apiClient } from "@/lib/api-client";
 
 interface FileUploadProps {
   onUploadSuccess?: () => void;
@@ -53,17 +54,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
     }, 200);
 
     try {
-      // In a real app, this would be a fetch call to your FastAPI backend
-      // const formData = new FormData()
-      // formData.append('file', file)
-      // const response = await fetch('https://your-fastapi-backend.com/upload', {
-      //   method: 'POST',
-      //   body: formData,
-      // })
-      // const data = await response.json()
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await apiClient.uploadDataset(file);
 
       clearInterval(interval);
       setProgress(100);
@@ -98,9 +89,7 @@ export default function FileUpload({ onUploadSuccess }: FileUploadProps) {
             <p className="text-sm text-muted-foreground text-center">
               {file ? file.name : "Click to upload or drag and drop"}
             </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              CSV files only (max 10MB)
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">CSV files only</p>
             <input
               id="file-upload"
               type="file"
